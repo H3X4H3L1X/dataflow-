@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DataFlow — see who every web page talks to</title>
+<meta name="description" content="DataFlow is a browser extension that names every company a web page contacts — trackers, ad networks, analytics — and explains what they collect. Nothing leaves your device.">
+<style>
+  :root {
+    --paper: #faf8f4;
+    --ink: #1b1916;
+    --muted: #7d766c;
+    --line: #e6e1d7;
+    --red: #c8361f;
+    --amber: #b07d10;
+    --green: #3e7a3a;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Charter, Georgia, "Times New Roman", serif;
+    font-size: 18px;
+    line-height: 1.65;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 0 24px; }
+
+  nav {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 28px 0; border-bottom: 1px solid var(--line);
+  }
+  .mark { font-family: var(--mono); font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+  .mark b { color: var(--red); }
+  nav a { color: var(--muted); text-decoration: none; font-family: var(--mono); font-size: 13px; margin-left: 20px; }
+  nav a:hover { color: var(--ink); }
+
+  header.hero { padding: 72px 0 40px; }
+  h1 {
+    font-size: 44px; line-height: 1.15; font-weight: 500; letter-spacing: -0.015em;
+    max-width: 560px;
+  }
+  .sub { color: var(--muted); margin-top: 20px; max-width: 520px; }
+  .cta-row { margin-top: 32px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; background: var(--ink); color: var(--paper);
+    font-family: var(--mono); font-size: 14px; text-decoration: none;
+    padding: 12px 22px; border: 1px solid var(--ink);
+  }
+  .btn:hover { background: var(--paper); color: var(--ink); }
+  .cta-note { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  /* ---- demo panel ---- */
+  .demo {
+    border: 1px solid var(--line); background: #fff;
+    font-family: var(--mono); font-size: 13px;
+    margin: 48px 0 0;
+  }
+  .demo-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px;
+  }
+  .rec { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--red); margin-right: 7px; animation: blink 1.6s infinite; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  .demo-grade {
+    display: flex; align-items: center; gap: 14px; padding: 16px; border-bottom: 1px solid var(--line);
+    font-family: Charter, Georgia, serif; font-size: 16px;
+  }
+  .g {
+    width: 44px; height: 44px; border: 2px solid var(--red); color: var(--red);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 24px; font-weight: 700; flex: none;
+  }
+  .row {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 8px 16px; border-bottom: 1px solid var(--line);
+    opacity: 0; animation: appear 0.4s forwards;
+  }
+  .row:last-child { border-bottom: none; }
+  @keyframes appear { to { opacity: 1; } }
+  .row .d { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .c { color: var(--muted); flex: none; }
+  .c.red { color: var(--red); }
+  .c.amber { color: var(--amber); }
+  .row:nth-child(3) { animation-delay: .15s; }
+  .row:nth-child(4) { animation-delay: .5s; }
+  .row:nth-child(5) { animation-delay: .8s; }
+  .row:nth-child(6) { animation-delay: 1.15s; }
+  .row:nth-child(7) { animation-delay: 1.4s; }
+  .row:nth-child(8) { animation-delay: 1.75s; }
+  .row:nth-child(9) { animation-delay: 2.1s; }
+
+  section { padding: 56px 0 0; }
+  h2 {
+    font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 18px;
+  }
+  p + p { margin-top: 14px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--line); background: #fff; }
+  .col { padding: 24px; }
+  .col + .col { border-left: 1px solid var(--line); }
+  .col h3 { font-size: 19px; font-weight: 600; }
+  .price { font-family: var(--mono); font-size: 13px; color: var(--muted); margin: 2px 0 16px; }
+  .col ul { list-style: none; }
+  .col li {
+    padding: 9px 0; border-top: 1px solid var(--line);
+    font-size: 15.5px; line-height: 1.5;
+  }
+  .col li small { display: block; color: var(--muted); font-size: 13.5px; }
+  .quiet { color: var(--muted); font-size: 15.5px; }
+
+  .legal { margin-top: 64px; border-top: 1px solid var(--line); padding: 40px 0 56px; }
+  .legal h2 { margin-bottom: 18px; }
+  .legal p { font-size: 15px; color: var(--muted); }
+  .legal b { color: var(--ink); font-weight: 600; }
+  .legal a { color: var(--ink); }
+  footer { font-family: var(--mono); font-size: 12px; color: var(--muted); padding-bottom: 48px; }
+
+  @media (max-width: 600px) {
+    h1 { font-size: 32px; }
+    .cols { grid-template-columns: 1fr; }
+    .col + .col { border-left: none; border-top: 1px solid var(--line); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav>
+    <span class="mark">data<b>flow</b></span>
+    <span>
+      <a href="#pricing">Pricing</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#install">Install</a>
+    </span>
+  </nav>
+
+  <header class="hero">
+    <h1>Your browser talks to strangers. DataFlow tells you their names.</h1>
+    <p class="sub">A browser extension that watches every request a web page makes and reports, in plain English, which companies received your visit — ad networks, fingerprinters, session recorders — and what they likely collect.</p>
+    <div class="cta-row" id="install">
+      <a class="btn" href="#">Install for Edge</a>
+      <span class="cta-note">Free · no account · under review on the Edge Add-ons store</span>
+    </div>
+
+    <div class="demo" aria-hidden="true">
+      <div class="demo-head">
+        <span><span class="rec"></span>observing: news-example.com</span>
+        <span>21 third parties</span>
+      </div>
+      <div class="demo-grade">
+        <span class="g">D</span>
+        <span>This page contacted 21 companies, including 9 trackers.</span>
+      </div>
+      <div class="row"><span class="d">doubleclick.net</span><span class="c red">Google Ads — cross-site tracking</span></div>
+      <div class="row"><span class="d">facebook.net</span><span class="c red">Meta Pixel — ad targeting</span></div>
+      <div class="row"><span class="d">rlcdn.com</span><span class="c red">LiveRamp — identity resolution</span></div>
+      <div class="row"><span class="d">hotjar.com</span><span class="c red">Hotjar — session recording</span></div>
+      <div class="row"><span class="d">adsrvr.org</span><span class="c red">The Trade Desk — ad profile</span></div>
+      <div class="row"><span class="d">scorecardresearch.com</span><span class="c amber">Comscore — audience measurement</span></div>
+      <div class="row"><span class="d">google-analytics.com</span><span class="c amber">Google Analytics</span></div>
+      <div class="row"><span class="d">cloudfront.net</span><span class="c">Amazon CDN — content delivery</span></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>Why this exists</h2>
+    <p>Blockers like uBlock or Ghostery remove trackers silently — useful, but you never learn what was actually happening. DataFlow does the opposite: it blocks nothing and shows everything. Every page gets a grade from A to F, every third party gets named and explained in one sentence, without jargon.</p>
+    <p>It runs entirely on your device. There is no server, no account, and the extension sends no data anywhere — an extension about surveillance shouldn't do any.</p>
+  </section>
+
+  <section id="pricing">
+    <h2>Pricing</h2>
+    <div class="cols">
+      <div class="col">
+        <h3>Free</h3>
+        <p class="price">0 € — forever</p>
+        <ul>
+          <li>Report card for every page, graded A to F</li>
+          <li>Every third party named, categorized, explained</li>
+          <li>Live tracker count on the toolbar icon</li>
+        </ul>
+      </div>
+      <div class="col">
+        <h3>Pro</h3>
+        <p class="price">10 € / month — cancel anytime</p>
+        <ul>
+          <li>Who is watching you everywhere
+            <small>Companies ranked by how many of your visited sites report to them — "Google saw you on 23 of 37 sites."</small></li>
+          <li>Worst offenders leaderboard
+            <small>Your personal A–F ranking of the sites you visit.</small></li>
+          <li>Report export
+            <small>Download any page's report as a clean document.</small></li>
+        </ul>
+      </div>
+    </div>
+    <p class="quiet" style="margin-top:14px">Pro history is computed and stored only on your device, like everything else.</p>
+  </section>
+
+  <div class="legal" id="privacy">
+    <h2>Privacy policy</h2>
+    <p><b>Data collection: none.</b> The DataFlow extension does not collect, transmit, sell, or share any user data. All network-request analysis happens locally in your browser. The browsing history used for Pro insights is stored only on your device (browser local storage) and can be deleted at any time from within the extension. The extension operates no server and makes no requests to us.</p>
+    <p style="margin-top:12px"><b>Payments.</b> Pro subscriptions are processed by <a href="https://extensionpay.com">ExtensionPay</a> and Stripe on their own pages. Payment details never pass through the extension. Their privacy policies govern payment data.</p>
+    <p style="margin-top:12px"><b>Contact.</b> <a href="https://github.com/H3X4H3L1X">github.com/H3X4H3L1X</a></p>
+  </div>
+
+  <footer>© 2026 DataFlow</footer>
+</div>
+</body>
+</html>
